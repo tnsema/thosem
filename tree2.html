@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Interactive Family Tree (arrays only)</title>
+  <style>
+    :root{
+      --bg:#0b1222;
+      --bg2:#071024;
+      --card:#f8fafc;
+      --muted:#96a3b4;
+      --accent:#00c2bd;
+      --accent-2:#60a5fa;
+      --danger:#ef4444;
+      --ring: rgba(0,194,189,.25);
+    }
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 20% 10%,rgba(0,194,189,.06),transparent),
+                                     radial-gradient(1200px 800px at 80% 0%,rgba(96,165,250,.06),transparent),
+                                     linear-gradient(180deg,var(--bg),var(--bg2));}
+    *{box-sizing:border-box}
+    .app{
+      height:100%;display:flex;flex-direction:column;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:var(--card);overflow:hidden;
+    }
+    header{
+      padding:10px 14px;display:flex;gap:10px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);
+      background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0));
+      position:relative;z-index:3
+    }
+    header h1{font-size:15px;margin:0 8px 0 0;font-weight:700;letter-spacing:.2px}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .btn{background:#0b1733;border:1px solid rgba(255,255,255,0.08);color:var(--card);padding:8px 10px;border-radius:10px;font-size:12px;cursor:pointer}
+    .btn:hover{border-color:rgba(255,255,255,.18);box-shadow:0 0 0 4px rgba(255,255,255,.03)}
+    .input{background:#0b1733;border:1px solid rgba(255,255,255,0.08);color:var(--card);padding:8px;border-radius:10px;font-size:13px}
+    .kbd{padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);font-size:11px}
+
+    .wrap{flex:1;display:flex;gap:12px;overflow:hidden;padding:12px;min-height:0}
+    .canvas{flex:1;position:relative;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      overflow:hidden;contain:layout paint;}
+
+    /* Stage = panning / zooming container */
+    .stage{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
+    svg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+
+    .node{position:absolute;min-width:190px;max-width:260px;padding:10px 12px;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border-radius:12px;border:1px solid rgba(255,255,255,0.12);box-shadow:0 10px 30px rgba(2,6,23,0.5);
+      cursor:grab;transition: left .25s ease, top .25s ease, box-shadow .15s ease, transform .12s ease;backdrop-filter: blur(6px);color:var(--card);font-size:13px}
+    .node:hover{transform:translateY(-3px);box-shadow:0 14px 38px rgba(2,6,23,0.7)}
+    .node:active{cursor:grabbing}
+    .name{font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+    .badge{font-size:10px;padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
+    .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .tags{display:flex;gap:6px;flex-wrap:wrap}
+    .tag{font-size:10.5px;padding:4px 6px;border-radius:999px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,.1)}
+    .dead{opacity:0.5;filter:grayscale(.35)}
+    .highlight{outline:2px solid var(--ring);box-shadow:0 8px 20px rgba(14,165,164,0.25)}
+
+    .legend{width:340px;padding:14px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.04), transparent);border:1px solid rgba(255,255,255,0.08);font-size:13px;overflow:auto}
+    .legend h3{margin:0 0 8px 0;font-size:14px}
+    .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .swatch{width:14px;height:14px;border-radius:3px}
+    .sw-old{background:#8b5cf6}
+    .sw-young{background:#06b6d4}
+    .sw-adopt{background:#f97316}
+    .note{font-size:12px;color:var(--muted)}
+    .small{font-size:12px;color:var(--muted)}
+
+    footer{padding:8px 14px;font-size:12px;color:var(--muted);border-top:1px solid rgba(255,255,255,0.06)}
+
+    /* Link animation */
+    .link{stroke:url(#linkGrad);stroke-width:2.2;fill:none;stroke-linecap:round}
+    .link.animate{stroke-dasharray:6 10;animation:dash 2.6s linear infinite}
+    .link.adopt{stroke-dasharray:6 6}
+    .link.step{stroke-dasharray:3 5}
+    @keyframes dash{to{stroke-dashoffset:-200}}
+
+    /* Search box */
+    .search{display:flex;align-items:center;gap:8px;background:#0b1733;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:6px 8px}
+    .search input{all:unset;width:220px;color:var(--card);font-size:13px}
+    .search .x{cursor:pointer;opacity:.6}
+
+    /* Mini-map */
+    .minimap{position:absolute;right:10px;bottom:10px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(5,10,24,.55);backdrop-filter:blur(4px);padding:6px;z-index:2}
+    .minimap canvas{display:block;width:180px;height:120px}
+    .mm-viewport{position:absolute;border:1.5px solid rgba(255,255,255,.8);border-radius:4px;pointer-events:none}
+
+    /* Tooltip */
+    .tip{position:fixed;pointer-events:none;z-index:5;transform:translate(-50%,-120%);background:rgba(13,19,40,.92);border:1px solid rgba(255,255,255,.12);padding:8px 10px;border-radius:10px;font-size:12px;color:#e8eef7;box-shadow:0 10px 24px rgba(0,0,0,.35);opacity:0;transition:opacity .12s}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Interactive Family Tree</h1>
+
+      <div class="search" title="Search by name or id (⌘/Ctrl+K)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="#a8b3c4" stroke-width="1.6"/></svg>
+        <input id="q" placeholder="Search…" />
+        <span id="clearQ" class="x">✕</span>
+      </div>
+
+      <div class="controls">
+        <label class="small">Generation gap</label>
+        <input id="genGap" class="input" type="range" min="120" max="320" value="180" />
+        <button id="fitBtn" class="btn" title="Fit (F)">Fit</button>
+        <button id="resetBtn" class="btn" title="Reset (R)">Reset</button>
+        <span class="small" title="Shortcuts">Zoom <span class="kbd">+</span>/<span class="kbd">-</span> · <span class="kbd">drag</span> to pan</span>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="canvas" id="canvas">
+        <div class="stage" id="stage">
+          <svg id="links"></svg>
+        </div>
+        <div class="minimap" id="minimap"><canvas width="300" height="200"></canvas><div class="mm-viewport" id="mmv"></div></div>
+      </div>
+
+      <aside class="legend">
+        <h3>Legend & actions</h3>
+        <div class="row"><div class="swatch sw-old"></div><div class="note">Older generation</div></div>
+        <div class="row"><div class="swatch sw-young"></div><div class="note">Younger generation</div></div>
+        <div class="row"><div class="swatch sw-adopt"></div><div class="note">Adoption / legal parent</div></div>
+        <hr />
+        <div class="note">Click node to toggle descendants. <strong>Shift+Click</strong> isolates direct relations. <strong>Double‑click</strong> centers node. <strong>Drag</strong> a node to tweak layout.</div>
+        <hr />
+        <div><strong>Included relationship types</strong></div>
+        <ul class="small">
+          <li>biological / adoptive / step parents</li>
+          <li>spouses & partnerships</li>
+          <li>half siblings & blended families</li>
+          <li>same‑sex parents</li>
+          <li>twins</li>
+        </ul>
+        <div class="small">Press <span class="kbd">F</span> to fit, <span class="kbd">R</span> to reset, <span class="kbd">Ctrl/⌘+K</span> to search, <span class="kbd">+</span>/<span class="kbd">-</span> to zoom.</div>
+      </aside>
+    </div>
+
+    <footer>
+      Pure arrays, no DB, no frameworks. Enhanced interactions: pan/zoom, live search, drag, minimap, animated links.
+    </footer>
+  </div>
+
+  <div class="tip" id="tip"></div>
+
+  <script>
+  // ---------- DATA (unchanged from your original, with minor placeholder fix) ----------
+  const nodes = [
+    { id: 'g1', name: 'Samuel Nkosi', birth: 1938, gender: 'M', status: 'deceased' },
+    { id: 'g2', name: 'Evelyn Nkosi', birth: 1941, gender: 'F', status: 'deceased' },
+    { id: 'a1', name: 'Mandla Nkosi', birth: 1962, gender: 'M' },
+    { id: 'a2', name: 'Thandiwe Maseko', birth: 1965, gender: 'F' },
+    { id: 'a3', name: 'Robert "Bert" Dlamini', birth: 1960, gender: 'M' },
+    { id: 'a4', name: 'Pauline Dlamini', birth: 1967, gender: 'F', status: 'deceased' },
+    { id: 'p1', name: 'Lerato Nkosi', birth: 1988, gender: 'F' },
+    { id: 'p2', name: 'Thabo Nkosi', birth: 1990, gender: 'M' },
+    { id: 'p3', name: 'Aisha Dlamini', birth: 1992, gender: 'F' },
+    { id: 'p4', name: 'Jordan Meyer', birth: 1986, gender: 'M' },
+    { id: 'p5', name: 'Zanele Mkhize', birth: 1978, gender: 'F' },
+    { id: 'c1', name: 'Kabelo Nkosi', birth: 2014, gender: 'M' },
+    { id: 'c2', name: 'Kea Nkosi', birth: 2014, gender: 'F', twinOf: 'c1' },
+    { id: 'c3', name: 'Mpho Meyer-Nkosi', birth: 2017, gender: 'M', adopted: true },
+    { id: 'c4', name: 'Ayanda Mkhize', birth: 2008, gender: 'F' },
+    { id: 'c5', name: 'Sihle Dlamini', birth: 2006, gender: 'M' },
+    { id: 'c6', name: 'Nokuthula "Nox" Nkosi', birth: 2009, gender: 'F' },
+    { id: 'c7', name: 'Eben Nkosi', birth: 1995, gender: 'M' },
+    { id: 'c8', name: 'Tiny Eben-Nkosi', birth: 2018, gender: 'F' },
+    { id: 's1', name: 'Michael Adams', birth: 1958, gender: 'M' }
+  ];
+
+  const relations = [
+    { type: 'parent', source: 'g1', target: 'a1' },
+    { type: 'parent', source: 'g2', target: 'a1' },
+    { type: 'parent', source: 'a1', target: 'p1' },
+    { type: 'parent', source: 'a2', target: 'p1' },
+    { type: 'parent', source: 'a1', target: 'p2' },
+    { type: 'parent', source: 'a3', target: 'p2' },
+    { type: 'parent', source: 'a3', target: 'p3' },
+    { type: 'parent', source: 'a4', target: 'p3' },
+    { type: 'spouse', source: 'p1', target: 'p4' },
+    { type: 'parent', source: 'p1', target: 'c1' },
+    { type: 'parent', source: 'p4', target: 'c1' },
+    { type: 'parent', source: 'p1', target: 'c2' },
+    { type: 'parent', source: 'p4', target: 'c2' },
+    { type: 'adopt',  source: 'p1', target: 'c3' },
+    { type: 'adopt',  source: 'p4', target: 'c3' },
+    { type: 'spouse', source: 'p5', target: 'p2' },
+    { type: 'parent', source: 'p5', target: 'c4' },
+    { type: 'parent', source: 'p3', target: 'c5' },
+    { type: 'parent', source: 'a1', target: 'c6' },
+    { type: 'parent', source: 'g2', target: 'c6' },
+    { type: 'parent', source: 'a2', target: 'c7' },
+    { type: 'parent', source: 'c7', target: 'c8' },
+    { type: 'spouse', source: 'a3', target: 's1' },
+    { type: 'step',   source: 's1', target: 'p2' },
+    { type: 'parent', source: 'p2', target: 'c3' }
+  ];
+
+  // Clean relations referencing existing nodes only
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const cleanRelations = relations.filter(r => nodeIds.has(r.source) && nodeIds.has(r.target));
+
+  // ---------- GRAPH STRUCTURES ----------
+  const parentsOf = new Map();
+  const childrenOf = new Map();
+  nodes.forEach(n => { parentsOf.set(n.id, new Set()); childrenOf.set(n.id, new Set()); });
+  cleanRelations.forEach(rel=>{
+    if(rel.type === 'parent' || rel.type === 'adopt' || rel.type === 'step'){
+      parentsOf.get(rel.target).add(rel.source);
+      childrenOf.get(rel.source).add(rel.target);
+    }
+  });
+
+  // Compute generation levels (BFS from root ancestors)
+  const level = Object.fromEntries(nodes.map(n => [n.id, Infinity]));
+  const queue = [];
+  nodes.forEach(n=>{ if(parentsOf.get(n.id).size===0){ level[n.id]=0; queue.push(n.id);} });
+  while(queue.length){
+    const cur = queue.shift();
+    const myLevel = level[cur];
+    childrenOf.get(cur).forEach(child =>{
+      const candidate = myLevel + 1;
+      if(candidate < level[child]){ level[child]=candidate; queue.push(child); }
+    });
+  }
+  // Relaxation for disconnected nodes
+  for(let k=0;k<20;k++){
+    nodes.forEach(n=>{
+      const ps = [...parentsOf.get(n.id)];
+      if(ps.length){ const parentMax = Math.max(...ps.map(p=> level[p]===Infinity?0:level[p])); level[n.id] = Math.min(level[n.id], parentMax+1); }
+      else level[n.id] = Math.min(level[n.id], 0);
+    });
+  }
+
+  const generations = {}; let maxLevel = 0;
+  nodes.forEach(n=>{ const l = Math.max(0, Math.floor(level[n.id]||0)); (generations[l]??=[]).push(n); maxLevel=Math.max(maxLevel,l); });
+
+  // ---------- LAYOUT ----------
+  const layout = {}; // id -> {x,y}
+  const canvasPadding = {x:60,y:40};
+  const genGapInput = document.getElementById('genGap');
+  let genGap = Number(genGapInput.value);
+  let measured = { width: 1400, height: 900 };
+
+  function computeLayout(){
+    genGap = Number(genGapInput.value);
+    const colSpacing = 280;
+    const levelCounts = Array.from({length:maxLevel+1}, (_,l)=> (generations[l]||[]).length || 1);
+    const maxCount = Math.max(...levelCounts);
+    const canvasWidth = Math.max(1200, maxCount * colSpacing + canvasPadding.x*2);
+    const canvasHeight = (maxLevel+1) * genGap + canvasPadding.y*2;
+
+    for(let l=0;l<=maxLevel;l++){
+      const list = generations[l]||[]; const count = list.length; const startX = (canvasWidth - (count-1)*colSpacing)/2;
+      list.forEach((n,i)=>{ layout[n.id] = { x: startX + i*colSpacing, y: canvasPadding.y + l*genGap }; });
+    }
+    measured = { width: canvasWidth, height: canvasHeight };
+  }
+
+  // ---------- RENDER ----------
+  const canvas = document.getElementById('canvas');
+  const stage  = document.getElementById('stage');
+  const svg    = document.getElementById('links');
+  const tip    = document.getElementById('tip');
+
+  function ensureSVGDefs(){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+    const glinear = document.createElementNS('http://www.w3.org/2000/svg','linearGradient');
+    glinear.setAttribute('id','linkGrad'); glinear.setAttribute('x1','0'); glinear.setAttribute('x2','1');
+    glinear.innerHTML = '<stop offset="0" stop-color="#60a5fa" stop-opacity="0.95"/>'+
+                        '<stop offset="1" stop-color="#00c2bd" stop-opacity="0.95"/>';
+    defs.appendChild(glinear); svg.appendChild(defs);
+  }
+
+  function drawLinks(filterVisible){
+    const isHidden = (id)=> hidden.has(id);
+    cleanRelations.forEach(rel=>{
+      if(filterVisible && (isHidden(rel.source) || isHidden(rel.target))) return;
+      const p = layout[rel.source]; const c = layout[rel.target]; if(!p||!c) return;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('class','link'+(rel.type==='adopt'?' adopt': rel.type==='step'?' step':''));
+      if(rel.type==='parent'){ path.classList.add('animate'); }
+      const sx = p.x + 120, sy = p.y + 74, tx = c.x + 120, ty = c.y + 0, midY = (sy+ty)/2;
+      path.setAttribute('d', `M ${sx} ${sy} C ${sx} ${midY} ${tx} ${midY} ${tx} ${ty}`);
+      svg.appendChild(path);
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx', tx); circle.setAttribute('cy', ty); circle.setAttribute('r', 3);
+      circle.setAttribute('fill', rel.type==='adopt' ? '#f97316' : '#06b6d4'); svg.appendChild(circle);
+
+      if(rel.type==='spouse'){
+        const a = layout[rel.source], b = layout[rel.target]; if(!a||!b) return;
+        const y = Math.min(a.y,b.y)+40, x1=a.x+180, x2=b.x+60; const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1',x1); line.setAttribute('y1',y); line.setAttribute('x2',x2); line.setAttribute('y2',y);
+        line.setAttribute('stroke','#94a3b8'); line.setAttribute('stroke-width','2'); line.setAttribute('stroke-dasharray','4 4'); svg.appendChild(line);
+      }
+    });
+  }
+
+  function drawNodes(){
+    document.querySelectorAll('.node').forEach(el=>el.remove());
+    nodes.forEach(n=>{
+      const pos = layout[n.id]; if(!pos) return;
+      const el = document.createElement('div'); el.className='node'; if(n.status==='deceased') el.classList.add('dead');
+      el.style.left=pos.x+'px'; el.style.top=pos.y+'px'; el.dataset.id=n.id;
+      const emoji = n.gender==='F'?'\uD83D\uDC6A': n.gender==='M'? '\uD83D\uDC68' : '👤';
+      el.innerHTML = `
+        <div class="name">${emoji} ${n.name} ${n.twinOf?'<span class="badge">twin</span>':''} ${n.adopted?'<span class="badge">adopted</span>':''} ${n.status==='deceased'?'<span class="badge">✝</span>':''}</div>
+        <div class="meta">${n.gender||''} · b. ${n.birth||'—'}</div>
+        <div class="tags"><div class="tag">id:${n.id}</div></div>
+      `;
+
+      // Hover tooltip
+      el.addEventListener('mousemove', (e)=>{
+        tip.style.opacity=1; tip.innerHTML = `<strong>${n.name}</strong><br/>${n.gender||''} · b. ${n.birth||'—'}`;
+        tip.style.left = e.clientX+'px'; tip.style.top = e.clientY+'px';
+      });
+      el.addEventListener('mouseleave', ()=>{ tip.style.opacity=0; });
+
+      // Interactions
+      el.addEventListener('click', (evt)=>{ evt.stopPropagation(); if(evt.shiftKey) { isolateNode(n.id); } else { toggleDescendants(n.id); } });
+      el.addEventListener('dblclick', ()=> centerOnPoint(layout[n.id].x+120, layout[n.id].y+40, true));
+
+      // Drag to tweak x within generation
+      makeDraggable(el, n.id);
+
+      stage.appendChild(el);
+    });
+  }
+
+  function renderAll(){
+    computeLayout(); ensureSVGDefs(); svg.setAttribute('width', measured.width); svg.setAttribute('height', measured.height);
+    stage.style.width = measured.width+'px'; stage.style.height = measured.height+'px';
+    drawNodes(); drawLinks(false); updateMinimap();
+  }
+
+  // ---------- VISIBILITY / TOGGLE ----------
+  const hidden = new Set();
+  function toggleDescendants(id){
+    const toProcess=[id]; const desc = new Set();
+    while(toProcess.length){ const cur=toProcess.pop(); childrenOf.get(cur).forEach(ch=>{ if(!desc.has(ch)){ desc.add(ch); toProcess.push(ch); } }); }
+    const anyVisible = [...desc].some(d=> !hidden.has(d));
+    if(anyVisible) desc.forEach(d=> hidden.add(d)); else desc.forEach(d=> hidden.delete(d));
+    refreshVisibility();
+  }
+  function isolateNode(id){
+    const keep = new Set([id]); parentsOf.get(id).forEach(p=>keep.add(p)); childrenOf.get(id).forEach(c=>keep.add(c));
+    cleanRelations.forEach(r=>{ if(r.type==='spouse' && (r.source===id || r.target===id)){ keep.add(r.source); keep.add(r.target); } });
+    nodes.forEach(n=>{ if(!keep.has(n.id)) hidden.add(n.id); else hidden.delete(n.id); });
+    refreshVisibility();
+  }
+  function refreshVisibility(){
+    const visible = new Set(nodes.filter(n=> !hidden.has(n.id)).map(n=> n.id));
+    document.querySelectorAll('.node').forEach(el=>{ el.style.display = visible.has(el.dataset.id)? 'block':'none'; });
+    ensureSVGDefs(); drawLinks(true); updateMinimap();
+  }
+
+  // ---------- PAN & ZOOM ----------
+  let scale = 1, panX = 0, panY = 0; const ZOOM_MIN=.4, ZOOM_MAX=2.2;
+  function applyTransform(){ stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`; updateMinimap(); }
+  function centerOnPoint(x,y,animate){
+    const rect = canvas.getBoundingClientRect();
+    const targetX = rect.width/2 - x*scale; const targetY = rect.height/2 - y*scale;
+    if(animate){ stage.style.transition='transform .25s ease'; panX=targetX; panY=targetY; applyTransform(); setTimeout(()=>stage.style.transition='',260); }
+    else { panX=targetX; panY=targetY; applyTransform(); }
+  }
+  function fitToView(){
+    const rect = canvas.getBoundingClientRect(); const margin = 40;
+    const sx = (rect.width - margin*2) / measured.width; const sy = (rect.height - margin*2) / measured.height; scale = Math.min(Math.max(Math.min(sx,sy), ZOOM_MIN), ZOOM_MAX);
+    panX = (rect.width - measured.width*scale)/2; panY = (rect.height - measured.height*scale)/2; applyTransform();
+  }
+
+  // Mouse wheel zoom
+  canvas.addEventListener('wheel', (e)=>{
+    if(!e.ctrlKey && !e.metaKey) { // smooth zoom regardless, prevent page scroll
+      e.preventDefault();
+      const delta = -Math.sign(e.deltaY) * 0.08; const prev = scale; const next = Math.min(Math.max(scale + delta, ZOOM_MIN), ZOOM_MAX);
+      const rect = canvas.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top; // zoom around cursor
+      const wx = (mx - panX)/scale; const wy = (my - panY)/scale; scale = next; panX = mx - wx*scale; panY = my - wy*scale; applyTransform();
+    }
+  }, { passive:false });
+
+  // Drag to pan background
+  let panning=false, sx=0, sy=0, spx=0, spy=0;
+  canvas.addEventListener('pointerdown', (e)=>{ if(e.target!==canvas) return; panning=true; sx=e.clientX; sy=e.clientY; spx=panX; spy=panY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e)=>{ if(!panning) return; panX = spx + (e.clientX - sx); panY = spy + (e.clientY - sy); applyTransform(); });
+  canvas.addEventListener('pointerup',   ()=>{ panning=false; });
+
+  // Keyboard
+  document.addEventListener('keydown', (e)=>{
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); document.getElementById('q').focus(); return; }
+    if(e.key==='+'||e.key==='='){ e.preventDefault(); scale=Math.min(scale+0.1,ZOOM_MAX); applyTransform(); }
+    if(e.key==='-'||e.key==='_'){ e.preventDefault(); scale=Math.max(scale-0.1,ZOOM_MIN); applyTransform(); }
+    if(e.key.toLowerCase()==='f'){ e.preventDefault(); fitToView(); }
+    if(e.key.toLowerCase()==='r'){ e.preventDefault(); hidden.clear(); refreshVisibility(); centerOnPoint(measured.width/2, measured.height/2, true); }
+  });
+
+  // ---------- DRAG NODES ----------
+  function makeDraggable(el, id){
+    let dragging=false, ox=0, oy=0, startLeft=0, startTop=0;
+    el.addEventListener('pointerdown',(e)=>{ dragging=true; el.setPointerCapture(e.pointerId); ox=e.clientX; oy=e.clientY; startLeft=parseFloat(el.style.left)||0; startTop=parseFloat(el.style.top)||0; });
+    el.addEventListener('pointermove',(e)=>{
+      if(!dragging) return; const dx=(e.clientX-ox)/scale, dy=(e.clientY-oy)/scale; el.style.left=(startLeft+dx)+'px'; el.style.top=(startTop+dy)+'px';
+      layout[id].x = startLeft+dx; layout[id].y = startTop+dy; ensureSVGDefs(); drawLinks(true); updateMinimap();
+    });
+    el.addEventListener('pointerup',()=>{ dragging=false; });
+  }
+
+  // ---------- SEARCH ----------
+  const q = document.getElementById('q');
+  const clearQ = document.getElementById('clearQ');
+  q.addEventListener('input', ()=>{
+    const term = q.value.trim().toLowerCase();
+    document.querySelectorAll('.node').forEach(el=> el.classList.remove('highlight'));
+    if(!term){ refreshVisibility(); return; }
+    const matched = nodes.filter(n => n.name.toLowerCase().includes(term) || n.id.toLowerCase().includes(term));
+    const keep = new Set(matched.map(n=>n.id));
+    nodes.forEach(n=>{ if(!keep.has(n.id)) hidden.add(n.id); else hidden.delete(n.id); });
+    refreshVisibility();
+    if(matched[0]){ const m = matched[0]; centerOnPoint(layout[m.id].x+120, layout[m.id].y+40, true); const el = document.querySelector(`.node[data-id="${m.id}"]`); if(el){ el.classList.add('highlight'); setTimeout(()=>el.classList.remove('highlight'), 1500);} }
+  });
+  clearQ.addEventListener('click', ()=>{ q.value=''; hidden.clear(); refreshVisibility(); });
+
+  // ---------- MINIMAP ----------
+  const mm = document.querySelector('#minimap canvas');
+  const mmv = document.getElementById('mmv');
+  function updateMinimap(){
+    const ctx = mm.getContext('2d');
+    ctx.clearRect(0,0,mm.width,mm.height);
+    const sx = mm.width / measured.width, sy = mm.height / measured.height; const s = Math.min(sx,sy);
+    ctx.save(); ctx.scale(s,s); ctx.fillStyle='rgba(255,255,255,.25)';
+    nodes.forEach(n=>{ if(hidden.has(n.id)) return; const p=layout[n.id]; if(!p) return; ctx.fillRect(p.x+104, p.y+20, 32, 18); });
+    ctx.restore();
+
+    // viewport rect
+    const rect = canvas.getBoundingClientRect();
+    const vw = rect.width/scale, vh = rect.height/scale; const vx = -panX/scale, vy = -panY/scale;
+    mmv.style.left = (vx * s + 6) + 'px'; mmv.style.top = (vy * s + 6) + 'px';
+    mmv.style.width = (vw * s) + 'px'; mmv.style.height = (vh * s) + 'px';
+  }
+  // Click on minimap to jump
+  document.getElementById('minimap').addEventListener('click', (e)=>{
+    const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - r.left - 6), y = (e.clientY - r.top - 6);
+    const sx = mm.width / measured.width, sy = mm.height / measured.height, s = Math.min(sx,sy);
+    const wx = x / s, wy = y / s; centerOnPoint(wx, wy, true);
+  });
+
+  // ---------- UI BUTTONS ----------
+  document.getElementById('fitBtn').addEventListener('click', fitToView);
+  document.getElementById('resetBtn').addEventListener('click', ()=>{ hidden.clear(); refreshVisibility(); fitToView(); });
+  genGapInput.addEventListener('input', ()=>{ renderAll(); fitToView(); });
+  canvas.addEventListener('click',(e)=>{ if(e.target===canvas){ hidden.clear(); refreshVisibility(); }});
+
+  // ---------- INIT ----------
+  // twin tag symmetry
+  nodes.forEach(n=>{ if(n.twinOf){ const t = nodes.find(x=>x.id===n.twinOf); if(t && !t.twinOf) t.twinOf=n.id; } });
+  computeLayout(); renderAll(); fitToView();
+
+  // Expose for console tinkering
+  window.family = { nodes, relations: cleanRelations, parentsOf, childrenOf, layout, generations };
+  </script>
+</body>
+</html>
