@@ -1,0 +1,50 @@
+[
+  {
+    "slug": "websites",
+    "label": "WEBSITES",
+    "title": "Websites for small businesses",
+    "desc": "Modern, mobile-first sites that are easy to understand and easy to use.",
+    "bestFor": ["Local services", "Small companies", "Freelancers"],
+    "includes": [
+      "Up to ~6 pages",
+      "Contact / quote form",
+      "Basic SEO setup",
+      "Performance setup"
+    ],
+    "note": "Good starting point if you’re not sure what you need yet.",
+    "img": "https://images.unsplash.com/photo-1522542550221-31fd19575a2d?auto=format&fit=crop&w=1800&q=70",
+    "alt": "Person working on a website on a laptop"
+  },
+  {
+    "slug": "landing-pages",
+    "label": "LANDING PAGES",
+    "title": "Landing pages & campaigns",
+    "desc": "Focused pages designed for one goal: calls, signups, or quote requests.",
+    "bestFor": ["New offers", "Ads", "Product launches"],
+    "includes": [
+      "One-page layout",
+      "Clear CTA",
+      "Analytics setup",
+      "Fast load"
+    ],
+    "note": "Ideal when you need something live quickly.",
+    "img": "https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1800&q=70",
+    "alt": "Marketing planning and conversion notes"
+  },
+  {
+    "slug": "small-web-apps",
+    "label": "SMALL WEB APPS",
+    "title": "Small web apps",
+    "desc": "Lightweight apps that automate one workflow without overbuilding.",
+    "bestFor": ["Booking requests", "Dashboards", "Client portals"],
+    "includes": [
+      "Simple auth (optional)",
+      "Admin view (optional)",
+      "Database (if needed)",
+      "Deploy + handover"
+    ],
+    "note": "We start with the simplest version, then iterate.",
+    "img": "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1800&q=70",
+    "alt": "Code displayed on a screen"
+  }
+]
