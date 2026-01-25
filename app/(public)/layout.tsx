@@ -47,7 +47,7 @@ export default function PublicLayout({
             <img
               src="/thosemLogo.png"
               alt="Thosem logo"
-              className="h-10 w-auto transition-opacity hover:opacity-80"
+              className="h-7 sm:h-8 md:h-10 w-auto transition-opacity hover:opacity-80"
             />
           </a>
         </div>
