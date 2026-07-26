@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Rajdhani, Orbitron } from "next/font/google";
 import "./globals.css";
 
@@ -28,6 +28,10 @@ const SITE_URL = "https://thosem.com";
 // Social preview image (put in /public/og.png, 1200x630 recommended)
 const OG_IMAGE = "/og.png";
 
+export const viewport: Viewport = {
+  themeColor: "#9C7627",
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
 
@@ -43,6 +47,12 @@ export const metadata: Metadata = {
   creator: "Thosem",
   publisher: "Thosem",
   category: "web development",
+
+  icons: {
+    icon: [{ url: "/t-logo.png", type: "image/png" }],
+    shortcut: ["/t-logo.png"],
+    apple: [{ url: "/t-logo.png", type: "image/png" }],
+  },
 
   keywords: [
     "web design",
@@ -72,13 +82,6 @@ export const metadata: Metadata = {
       "max-snippet": -1,
       "max-video-preview": -1,
     },
-  },
-
-  themeColor: "#9C7627",
-
-  icons: {
-    icon: [{ url: "/favicon.ico" }, { url: "/icon.png", type: "image/png" }],
-    apple: [{ url: "/apple-icon.png" }],
   },
 
   openGraph: {
@@ -121,7 +124,7 @@ export default function RootLayout({
               "@type": "Organization",
               name: "Thosem",
               url: "https://thosem.com",
-              logo: "https://thosem.com/icon.png",
+              logo: "https://thosem.com/t-logo.png",
               description:
                 "Web studio building clean websites, landing pages, and small web apps for small businesses.",
               areaServed: [
