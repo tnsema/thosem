@@ -75,11 +75,11 @@ export default function PublicLayout({
           <div className="mb-8 mt-8 text-center">
             <div className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden">
               <Image
-                src="/thosem-lg2.png"
+                src="/t-logo.png"
                 alt="Thosem"
                 width={96}
                 height={96}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
                 priority
               />
             </div>
