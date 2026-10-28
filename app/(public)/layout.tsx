@@ -235,30 +235,30 @@ export default function PublicLayout({
               <ul className="mt-6 space-y-3 text-gray-400">
                 <li>
                   <a
-                    href="mailto:thobilesema@gmail.com"
+                    href="mailto:-"
                     className="hover:text-white transition-colors"
                   >
-                    thobilesema@gmail.com
+                   Email -
                   </a>
                 </li>
 
                 <li>
                   <a
-                    href="https://wa.me/27838133619"
+                    href="https://wa.me/-"
                     target="_blank"
                     rel="noreferrer"
                     className="hover:text-white transition-colors"
                   >
-                    WhatsApp: +27 83 813 3619
+                    WhatsApp: -
                   </a>
                 </li>
 
                 <li>
                   <a
-                    href="tel:+27838133619"
+                    href="tel:-"
                     className="hover:text-white transition-colors"
                   >
-                    Call: +27 83 813 3619
+                    Call: -
                   </a>
                 </li>
               </ul>

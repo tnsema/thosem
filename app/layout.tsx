@@ -140,7 +140,7 @@ export default function RootLayout({
               contactPoint: {
                 "@type": "ContactPoint",
                 contactType: "customer support",
-                email: "thobilesema@gmail.com",
+                email: "-",
                 availableLanguage: ["English"],
               },
               sameAs: [
